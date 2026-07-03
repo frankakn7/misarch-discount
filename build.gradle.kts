@@ -37,6 +37,7 @@ dependencies {
 	implementation("io.dapr:dapr-sdk-springboot:1.11.0")
 	runtimeOnly("org.postgresql:postgresql")
 	runtimeOnly("org.postgresql:r2dbc-postgresql")
+	runtimeOnly("io.r2dbc:r2dbc-pool")
 	kapt("com.querydsl:querydsl-core:5.0.0")
 	kapt("com.querydsl:querydsl-apt:5.0.0")
 }

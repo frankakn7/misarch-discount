@@ -3,6 +3,12 @@ spring:
     allow-bean-definition-overriding: true
   flyway:
     locations: classpath:db/migration
+  r2dbc:
+    pool:
+      initial-size: 2
+      max-size: 10
+      max-idle-time: 30m
+      max-life-time: 60m
 management:
   endpoints:
     web:

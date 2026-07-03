@@ -161,13 +161,14 @@ class DiscountService(
     private suspend fun ensureEntitiesExist(
         categoryIds: Set<UUID>, productIds: Set<UUID>, productVariantIds: Set<UUID>
     ) {
-        val missingCategories = categoryIds.filter { !categoryRepository.existsById(it).awaitSingle() }
+        val existingCategoryIds = categoryRepository.findAllById(categoryIds).collectList().awaitSingle().map { it.id!! }.toSet()
+        val missingCategories = categoryIds - existingCategoryIds
         require(missingCategories.isEmpty()) { "Categories with ids $missingCategories do not exist" }
-        val missingProducts = productIds.filter { !productRepository.existsById(it).awaitSingle() }
+        val existingProductIds = productRepository.findAllById(productIds).collectList().awaitSingle().map { it.id!! }.toSet()
+        val missingProducts = productIds - existingProductIds
         require(missingProducts.isEmpty()) { "Products with ids $missingProducts do not exist" }
-        val missingProductVariants = productVariantIds.filter {
-            !productVariantRepository.existsById(it).awaitSingle()
-        }
+        val existingProductVariantIds = productVariantRepository.findAllById(productVariantIds).collectList().awaitSingle().map { it.id!! }.toSet()
+        val missingProductVariants = productVariantIds - existingProductVariantIds
         require(missingProductVariants.isEmpty()) { "Product variants with ids $missingProductVariants do not exist" }
     }
 
