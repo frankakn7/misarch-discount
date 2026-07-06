@@ -9,6 +9,11 @@ spring:
       max-size: 10
       max-idle-time: 30m
       max-life-time: 60m
+logging:
+  level:
+    io.r2dbc.pool: ${R2DBC_POOL_LOG_LEVEL:WARN}
+    io.r2dbc.postgresql: ${R2DBC_POSTGRES_LOG_LEVEL:WARN}
+    org.misarch.discount: ${DISCOUNT_LOG_LEVEL:WARN}
 management:
   endpoints:
     web:

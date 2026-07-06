@@ -18,9 +18,11 @@ import org.misarch.discount.graphql.input.UpdateDiscountInput
 import org.misarch.discount.graphql.model.DiscountsForProductVariant
 import org.misarch.discount.persistence.model.*
 import org.misarch.discount.persistence.repository.*
+import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 import java.time.OffsetDateTime
 import java.util.*
+import kotlin.system.measureTimeMillis
 
 /**
  * Service for [DiscountEntity]s
@@ -49,6 +51,8 @@ class DiscountService(
     private val couponRepository: CouponRepository,
     private val eventPublisher: EventPublisher
 ) : BaseService<DiscountEntity, DiscountRepository>(repository) {
+
+    private val logger = LoggerFactory.getLogger(javaClass)
 
     /**
      * Creates a discount
@@ -275,21 +279,40 @@ class DiscountService(
     suspend fun findApplicableDiscounts(
         input: FindApplicableDiscountsInput
     ): List<DiscountsForProductVariant> {
-        verifyProductVariants(input)
-        val productVariantInputsWithDiscounts = input.productVariants.map { productVariantInput ->
+        val totalStart = System.currentTimeMillis()
+        logger.debug("findApplicableDiscounts: userId={}, variantCount={}, couponCount={}",
+            input.userId, input.productVariants.size, input.productVariants.sumOf { it.couponIds.size })
+
+        val verifyTime = measureTimeMillis {
+            verifyProductVariants(input)
+        }
+        logger.debug("verifyProductVariants: {}ms", verifyTime)
+
+        val productVariantInputsWithDiscounts = input.productVariants.mapIndexed { i, productVariantInput ->
+            val start = System.currentTimeMillis()
             val discounts = findApplicableDiscountsForProductVariant(productVariantInput, input)
+            logger.debug("findApplicableDiscountsForProductVariant[{}]: variantId={}, {}ms", i, productVariantInput.productVariantId, System.currentTimeMillis() - start)
             Pair(productVariantInput, discounts)
         }
+
         val discounts = productVariantInputsWithDiscounts.flatMap { it.second }.toSet()
+        val usageStart = System.currentTimeMillis()
         val remainingUsages = findRemainingUsagesForDiscounts(input.userId, discounts).toMutableMap()
+        logger.debug("findRemainingUsages: {}ms, discountCount={}", System.currentTimeMillis() - usageStart, discounts.size)
+
         val couponIds = input.productVariants.flatMap { it.couponIds }.toSet()
+        val couponStart = System.currentTimeMillis()
         val couponsById = couponRepository.findAllById(couponIds).collectList().awaitSingle().associateBy { it.id }
+        logger.debug("couponRepository.findAllById: {}ms, couponCount={}", System.currentTimeMillis() - couponStart, couponIds.size)
+
         require(couponIds.all { it in couponsById }) {
             "Coupon(s) with id(s) ${couponIds.filter { it !in couponsById }} do(es) not exist"
         }
-        return productVariantInputsWithDiscounts.map { (productVariantInput, discounts) ->
+        val result = productVariantInputsWithDiscounts.map { (productVariantInput, discounts) ->
             filterApplicableDiscounts(discounts, remainingUsages, productVariantInput, couponsById)
         }
+        logger.debug("findApplicableDiscounts total: {}ms, resultCount={}", System.currentTimeMillis() - totalStart, result.size)
+        return result
     }
 
     /**
